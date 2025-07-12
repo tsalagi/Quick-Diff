@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>QuickDiff - Advanced Text Difference Checker</title>
+<style>
+body { font-family: Arial, sans-serif; line-height: 1.5; margin: 20px; background: #f9f9f9; }
+.container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+header { text-align: center; margin-bottom: 20px; }
+header h1 { margin: 0; font-size: 2em; color: #333; }
+header p { color: #666; margin: 5px 0; }
+.help-section { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; padding: 15px; margin-bottom: 20px; font-size: 0.9em; }
+.help-section h3 { margin: 0 0 10px 0; color: #495057; }
+.help-section ul { margin: 5px 0; padding-left: 20px; }
+.help-section li { margin: 3px 0; }
+.legend { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-color { width: 20px; height: 16px; border-radius: 3px; border: 1px solid #ddd; }
+
+/* Enhanced Controls Section */
+.controls-section { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 20px; margin-bottom: 20px; }
+.controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+.control-group { display: flex; flex-direction: column; gap: 5px; }
+.control-group label { font-weight: bold; color: #495057; font-size: 0.9em; }
+.control-select { padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; font-size: 0.9em; }
+.control-select:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,0.25); }
+.tooltip { position: relative; cursor: help; }
+.tooltip:hover::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 5px 8px; border-radius: 4px; font-size: 0.8em; white-space: nowrap; z-index: 1000; }
+.tooltip:hover::before { content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border: 4px solid transparent; border-top-color: #333; }
+
+.buttons { text-align: center; margin-bottom: 20px; }
+button { margin: 0 5px; padding: 8px 12px; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; }
+#run { background: #007bff; color: white; }
+#copy { background: #6c757d; color: white; }
+#copy:disabled { background: #ccc; cursor: default; }
+#download { background: #17a2b8; color: white; }
+#download:disabled { background: #ccc; cursor: default; }
+#load { background: #28a745; color: white; }
+#ignore { margin-left: 10px; vertical-align: middle; }
+.view-toggle { margin-left: 15px; }
+.view-toggle label { margin-left: 5px; }
+.textareas { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.textarea-container { flex: 1; min-width: 200px; }
+.textarea-container label { font-weight: bold; color: #495057; }
+textarea { width: 100%; height: 200px; padding: 8px; resize: vertical; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+#results-container { display: none; margin-top: 20px; }
+#summary { margin-bottom: 15px; font-weight: bold; text-align: center; padding: 10px; background: #f8f9fa; border-radius: 4px; }
+#diff { max-height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 4px; background: white; }
+
+/* Unified view styles */
+.diff-line { font-family: 'Courier New', monospace; white-space: pre-wrap; display: block; padding: 4px 8px; border-left: 3px solid transparent; position: relative; }
+.diff-line-number { display: inline-block; width: 40px; color: #666; font-size: 0.85em; margin-right: 10px; }
+.diff-add-line { background-color: #e6ffed; border-left-color: #28a745; }
+.diff-remove-line { background-color: #fff5f5; border-left-color: #dc3545; }
+.diff-unchanged-line { background-color: white; }
+.diff-modified-line { background-color: #fff9e6; border-left-color: #ffc107; }
+.diff-add-line::before { content: '+'; color: #28a745; margin-right: 8px; font-weight: bold; }
+.diff-remove-line::before { content: '-'; color: #dc3545; margin-right: 8px; font-weight: bold; }
+.diff-unchanged-line::before { content: ' '; margin-right: 8px; }
+.diff-modified-line::before { content: '~'; color: #ffc107; margin-right: 8px; font-weight: bold; }
+
+/* Side-by-side view styles */
+.side-by-side { display: flex; }
+.side-by-side .side { flex: 1; border-right: 1px solid #ddd; }
+.side-by-side .side:last-child { border-right: none; }
+.side-header { background: #f8f9fa; padding: 8px 12px; font-weight: bold; border-bottom: 1px solid #ddd; text-align: center; }
+.side-header.original { color: #dc3545; }
+.side-header.modified { color: #28a745; }
+.side-content { max-height: 450px; overflow-y: auto; }
+.side-line { font-family: 'Courier New', monospace; white-space: pre-wrap; padding: 4px 8px; display: flex; align-items: flex-start; min-height: 20px; cursor: pointer; }
+.side-line:hover { background-color: #f0f0f0; }
+.side-line-number { width: 35px; color: #666; font-size: 0.85em; margin-right: 8px; flex-shrink: 0; }
+.side-line-content { flex: 1; }
+.side-line.changed { background-color: #fff9e6; }
+.side-line.added { background-color: #e6ffed; }
+.side-line.removed { background-color: #fff5f5; }
+
+/* Word-level highlighting */
+.word-added { background-color: #28a745; color: white; padding: 1px 2px; border-radius: 2px; }
+.word-removed { background-color: #dc3545; color: white; padding: 1px 2px; border-radius: 2px; }
+.word-changed-old { background-color: #ffc107; color: #212529; padding: 1px 2px; border-radius: 2px; }
+.word-changed-new { background-color: #17a2b8; color: white; padding: 1px 2px; border-radius: 2px; }
+
+/* Fuzzy match indicators */
+.fuzzy-match { position: relative; }
+.confidence-badge { position: absolute; top: -8px; right: 2px; background: #007bff; color: white; font-size: 0.7em; padding: 1px 4px; border-radius: 8px; }
+.match-highlight { background-color: #ffeb3b; padding: 1px 2px; border-radius: 2px; cursor: pointer; }
+.match-highlight:hover { background-color: #ffc107; }
+
+.results-outdated { opacity: 0.6; }
+.outdated-notice { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 8px; border-radius: 4px; margin-bottom: 10px; text-align: center; font-size: 0.9em; }
+
+@media (max-width: 768px) {
+  .controls-grid { grid-template-columns: 1fr; }
+  .side-by-side { flex-direction: column; }
+  .side-by-side .side { border-right: none; border-bottom: 1px solid #ddd; }
+  .side-by-side .side:last-child { border-bottom: none; }
+  .legend { flex-direction: column; align-items: center; }
+}
+</style>
+</head>
+<body>
+<div class='container'>
+<header>
+  <h1>QuickDiff</h1>
+  <p>Advanced text difference checker with intelligent comparison modes</p>
+</header>
+
+<div class='help-section'>
+  <h3>How to Use QuickDiff</h3>
+  <ul>
+    <li><strong>Choose mode:</strong> Code (exact matching) or Manuscript (fuzzy matching with OCR tolerance)</li>
+    <li><strong>Select matching:</strong> Exact for precise comparison, Fuzzy for handling typos and variations</li>
+    <li><strong>Pick granularity:</strong> Line, Sentence, or Paragraph level comparison</li>
+    <li><strong>Enter text:</strong> Paste or type your original and modified text in the boxes below</li>
+    <li><strong>Run comparison:</strong> Click "Run Diff" or press Ctrl+Enter to see differences</li>
+    <li><strong>Interactive features:</strong> Double-click words to find matches, hover for confidence scores</li>
+  </ul>
+  <div class='legend'>
+    <div class='legend-item'>
+      <div class='legend-color word-added'></div>
+      <span>Added content</span>
+    </div>
+    <div class='legend-item'>
+      <div class='legend-color word-removed'></div>
+      <span>Removed content</span>
+    </div>
+    <div class='legend-item'>
+      <div class='legend-color word-changed-old'></div>
+      <span>Original content</span>
+    </div>
+    <div class='legend-item'>
+      <div class='legend-color word-changed-new'></div>
+      <span>Modified content</span>
+    </div>
+    <div class='legend-item'>
+      <div class='legend-color match-highlight'></div>
+      <span>Fuzzy matches</span>
+    </div>
+  </div>
+</div>
+
+<!-- Enhanced Controls Section -->
+<div class='controls-section'>
+  <div class='controls-grid'>
+    <div class='control-group'>
+      <label for='mode-select' class='tooltip' data-tooltip='Code: line-by-line exact matching | Manuscript: content-aware with OCR tolerance'>Comparison Mode</label>
+      <select id='mode-select' class='control-select'>
+        <option value='code'>Code</option>
+        <option value='manuscript'>Manuscript</option>
+      </select>
+    </div>
+    
+    <div class='control-group'>
+      <label for='matching-select' class='tooltip' data-tooltip='Exact: precise string matching | Fuzzy: handles typos, OCR errors, and variations'>Matching Type</label>
+      <select id='matching-select' class='control-select'>
+        <option value='exact'>Exact</option>
+        <option value='fuzzy'>Fuzzy</option>
+      </select>
+    </div>
+    
+    <div class='control-group'>
+      <label for='granularity-select' class='tooltip' data-tooltip='Line: compare line-by-line | Sentence: compare by sentences | Paragraph: compare by paragraphs'>Granularity</label>
+      <select id='granularity-select' class='control-select'>
+        <option value='line'>Line</option>
+        <option value='sentence'>Sentence</option>
+        <option value='paragraph'>Paragraph</option>
+      </select>
+    </div>
+    
+    <div class='control-group'>
+      <label for='fuzzy-threshold' class='tooltip' data-tooltip='Similarity threshold for fuzzy matching (70-95%)'>Fuzzy Threshold</label>
+      <select id='fuzzy-threshold' class='control-select'>
+        <option value='0.7'>70%</option>
+        <option value='0.8' selected>80%</option>
+        <option value='0.9'>90%</option>
+        <option value='0.95'>95%</option>
+      </select>
+    </div>
+    
+    <div class='control-group'>
+      <label for='context-window' class='tooltip' data-tooltip='Word group size for contextual matching (3-7 words)'>Context Window</label>
+      <select id='context-window' class='control-select'>
+        <option value='3'>3 words</option>
+        <option value='5' selected>5 words</option>
+        <option value='7'>7 words</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class='buttons'>
+<button id='run'>Run Diff</button>
+<button id='copy' disabled>Copy Results</button>
+<button id='download' disabled>Download Results</button>
+<button id='load'>Load Sample</button>
+<label><input type='checkbox' id='ignore'> Ignore Whitespace</label>
+<div class='view-toggle'>
+  <input type='radio' id='unified-view' name='view-mode' value='unified' checked>
+  <label for='unified-view'>Unified View</label>
+  <input type='radio' id='side-view' name='view-mode' value='side'>
+  <label for='side-view'>Side-by-Side</label>
+</div>
+</div>
+
+<div class='textareas'>
+<div class='textarea-container'><label for='original'>Original Text</label><textarea id='original' placeholder='Enter your original text here...'></textarea></div>
+<div class='textarea-container'><label for='modified'>Modified Text</label><textarea id='modified' placeholder='Enter your modified text here...'></textarea></div>
+</div>
+
+<div id='results-container'>
+<div id='outdated-notice' class='outdated-notice' style='display: none;'>
+Text has been modified. Click "Run Diff" to update results.
+</div>
+<div id='summary'></div>
+<div id='diff'></div>
+</div>
+</div>
+
+<!-- Capabilities Section -->
+<div class='container' style='margin-top: 40px; border-top: 2px solid #e9ecef; padding-top: 30px;'>
+<div class='help-section'>
+  <h3>🔧 QuickDiff Capabilities</h3>
+  
+  <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 15px;'>
+    
+    <div>
+      <h4 style='color: #007bff; margin: 0 0 8px 0; font-size: 1em;'>📝 Comparison Modes</h4>
+      <ul style='margin: 0; font-size: 0.9em;'>
+        <li><strong>Code Mode:</strong> Exact line-by-line matching for programming code</li>
+        <li><strong>Manuscript Mode:</strong> Fuzzy matching with OCR error tolerance</li>
+        <li><strong>Context Matching:</strong> 3-7 word sliding window for relocated text</li>
+        <li><strong>Sentence/Paragraph Level:</strong> Structural comparison options</li>
+      </ul>
+    </div>
+    
+    <div>
+      <h4 style='color: #28a745; margin: 0 0 8px 0; font-size: 1em;'>🎨 Visualization Features</h4>
+      <ul style='margin: 0; font-size: 0.9em;'>
+        <li><strong>Unified View:</strong> All changes in single column with +/- indicators</li>
+        <li><strong>Side-by-Side View:</strong> Original and modified text in parallel columns</li>
+        <li><strong>Word-Level Highlighting:</strong> Precise change detection within lines</li>
+        <li><strong>Color Coding:</strong> Green (added), red (removed), yellow/blue (modified)</li>
+      </ul>
+    </div>
+    
+    <div>
+      <h4 style='color: #17a2b8; margin: 0 0 8px 0; font-size: 1em;'>⚡ Interactive Features</h4>
+      <ul style='margin: 0; font-size: 0.9em;'>
+        <li><strong>Double-Click Navigation:</strong> Jump to matching context in other pane</li>
+        <li><strong>Hover Confidence:</strong> Shows match percentage for fuzzy results</li>
+        <li><strong>Real-Time Updates:</strong> Automatic outdated result detection</li>
+        <li><strong>Keyboard Shortcuts:</strong> Ctrl+Enter to run, Ctrl+C to copy</li>
+      </ul>
+    </div>
+    
+    <div>
+      <h4 style='color: #6f42c1; margin: 0 0 8px 0; font-size: 1em;'>🛠️ Processing Options</h4>
+      <ul style='margin: 0; font-size: 0.9em;'>
+        <li><strong>Whitespace Handling:</strong> Option to ignore spaces, tabs, line breaks</li>
+        <li><strong>Fuzzy Threshold:</strong> Adjustable similarity matching (70-95%)</li>
+        <li><strong>Context Window:</strong> Configurable word-group size (3-7 words)</li>
+        <li><strong>OCR Error Tolerance:</strong> Handles common scanning mistakes</li>
+      </ul>
+    </div>
+    
+    <div>
+      <h4 style='color: #dc3545; margin: 0 0 8px 0; font-size: 1em;'>📤 Export & Sharing</h4>
+      <ul style='margin: 0; font-size: 0.9em;'>
+        <li><strong>Copy to Clipboard:</strong> Plain text diff with +/- prefixes</li>
+        <li><strong>Download Results:</strong> Timestamped .txt file with full report</li>
+        <li><strong>Summary Statistics:</strong> Added, removed, modified line counts</li>
+        <li><strong>Sample Data:</strong> Built-in test content for quick demos</li>
+      </ul>
+    </div>
+    
+    <div>
+      <h4 style='color: #fd7e14; margin: 0 0 8px 0; font-size: 1em;'>🔍 Algorithm Details</h4>
+      <ul style='margin: 0; font-size: 0.9em;'>
+        <li><strong>Myers Algorithm:</strong> Efficient line-based diff computation</li>
+        <li><strong>Levenshtein Distance:</strong> Character-level similarity scoring</li>
+        <li><strong>LCS Matching:</strong> Longest Common Subsequence detection</li>
+        <li><strong>Word Tokenization:</strong> Smart boundary detection for text units</li>
+      </ul>
+    </div>
+    
+  </div>
+  
+  <div style='margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #007bff;'>
+    <p style='margin: 0; font-size: 0.9em; color: #495057;'>
+      <strong>💡 Use Cases:</strong> Code reviews, document versioning, manuscript comparison, OCR output validation, 
+      legal document analysis, academic paper revisions, translation comparison, and content migration verification.
+    </p>
+  </div>
+</div>
+</div>
+
+<template id='sample-original'>
+The quick brown fox jumps over the lazy dog.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam, quis nostrud exercitation.
+Ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate.
+Velit esse cillum dolore eu fugiat nulla pariatur.
+Excepteur sint occaecat cupidatat non proident.
+Sunt in culpa qui officia deserunt mollit anim id est laborum.
+The end of the sample text.
+</template>
+
+<template id='sample-modified'>
+The quick red fox jumps over the sleeping dog.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam, quis nostrud exercitation ullamco.
+Laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit.
+Velit esse cillum dolore eu fugiat nulla pariatur.
+This is a completely new line that was added.
+Excepteur sint occaecat cupidatat non proident.
+Sunt in culpa qui officia deserunt mollit anim id est laborum.
+The end of the modified sample text.
+</template>
+
+<script>
+document.addEventListener('DOMContentLoaded',() => {
+  const orig = document.getElementById('original'),
+        mod = document.getElementById('modified'),
+        runBtn = document.getElementById('run'),
+        copyBtn = document.getElementById('copy'),
+        downloadBtn = document.getElementById('download'),
+        loadBtn = document.getElementById('load'),
+        ignoreCb = document.getElementById('ignore'),
+        unifiedView = document.getElementById('unified-view'),
+        sideView = document.getElementById('side-view'),
+        results = document.getElementById('results-container'),
+        summary = document.getElementById('summary'),
+        output = document.getElementById('diff'),
+        outdatedNotice = document.getElementById('outdated-notice');
+  
+  // New control elements
+  const modeSelect = document.getElementById('mode-select'),
+        matchingSelect = document.getElementById('matching-select'),
+        granularitySelect = document.getElementById('granularity-select'),
+        fuzzyThreshold = document.getElementById('fuzzy-threshold'),
+        contextWindow = document.getElementById('context-window');
+  
+  let lastText = '';
+  let lastOriginalText = '';
+  let lastModifiedText = '';
+  let lastIgnoreWhitespace = false;
+  let currentDiffData = null;
+  
+  // Smart defaults based on mode
+  modeSelect.addEventListener('change', () => {
+    if (modeSelect.value === 'code') {
+      matchingSelect.value = 'exact';
+      granularitySelect.value = 'line';
+    } else if (modeSelect.value === 'manuscript') {
+      matchingSelect.value = 'fuzzy';
+      granularitySelect.value = 'sentence';
+    }
+  });
+  
+  // Levenshtein distance for fuzzy matching
+  function levenshteinDistance(str1, str2) {
+    const matrix = Array(str2.length + 1).fill(0).map(() => Array(str1.length + 1).fill(0));
+    
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j - 1][i] + 1,
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i - 1] + cost
+        );
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+  
+  // Calculate similarity percentage
+  function calculateSimilarity(str1, str2) {
+    const maxLen = Math.max(str1.length, str2.length);
+    if (maxLen === 0) return 1;
+    const distance = levenshteinDistance(str1, str2);
+    return (maxLen - distance) / maxLen;
+  }
+  
+  // Fuzzy line matching
+  function fuzzyLineMatch(line1, line2, threshold) {
+    const similarity = calculateSimilarity(line1.toLowerCase().trim(), line2.toLowerCase().trim());
+    return { match: similarity >= threshold, confidence: similarity };
+  }
+  
+  // Context window matching
+  function extractContextWindows(text, windowSize) {
+    const words = text.split(/\s+/);
+    const windows = [];
+    for (let i = 0; i <= words.length - windowSize; i++) {
+      windows.push({
+        text: words.slice(i, i + windowSize).join(' '),
+        startIndex: i,
+        endIndex: i + windowSize - 1
+      });
+    }
+    return windows;
+  }
+  
+  // Split text by granularity
+  function splitByGranularity(text, granularity) {
+    switch (granularity) {
+      case 'line':
+        return text.split('\n');
+      case 'sentence':
+        return text.split(/[.!?]+/).filter(s => s.trim().length > 0).map(s => s.trim());
+      case 'paragraph':
+        return text.split(/\n\s*\n/).filter(p => p.trim().length > 0).map(p => p.trim());
+      default:
+        return text.split('\n');
+    }
+  }
+  
+  // Word-level diff algorithm
+  function diffWords(oldStr, newStr) {
+    const oldWords = oldStr.split(/(\s+)/);
+    const newWords = newStr.split(/(\s+)/);
+    
+    const matrix = Array(oldWords.length + 1).fill(0).map(() => Array(newWords.length + 1).fill(0));
+    
+    for (let i = 1; i <= oldWords.length; i++) {
+      for (let j = 1; j <= newWords.length; j++) {
+        if (oldWords[i - 1] === newWords[j - 1]) {
+          matrix[i][j] = matrix[i - 1][j - 1] + 1;
+        } else {
+          matrix[i][j] = Math.max(matrix[i - 1][j], matrix[i][j - 1]);
+        }
+      }
+    }
+    
+    const result = [];
+    let i = oldWords.length, j = newWords.length;
+    
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldWords[i - 1] === newWords[j - 1]) {
+        result.unshift({ type: 'unchanged', value: oldWords[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || matrix[i][j - 1] >= matrix[i - 1][j])) {
+        result.unshift({ type: 'added', value: newWords[j - 1] });
+        j--;
+      } else if (i > 0) {
+        result.unshift({ type: 'removed', value: oldWords[i - 1] });
+        i--;
+      }
+    }
+    
+    return result;
+  }
+  
+  // Enhanced diff algorithm with fuzzy matching
+  function enhancedDiff(originalUnits, modifiedUnits, options = {}) {
+    const { 
+      matching = 'exact', 
+      threshold = 0.8, 
+      contextWindow = 5 
+    } = options;
+    
+    if (matching === 'exact') {
+      return exactDiff(originalUnits, modifiedUnits);
+    } else {
+      return fuzzyDiff(originalUnits, modifiedUnits, threshold, contextWindow);
+    }
+  }
+  
+  // Exact diff (original algorithm)
+  function exactDiff(a, b) {
+    const N = a.length, M = b.length, max = N + M, v = {}, trace = [];
+    v[1] = 0;
+    for (let d = 0; d <= max; d++) {
+      for (let k = -d; k <= d; k += 2) {
+        let x = (k === -d || (k !== d && v[k - 1] < v[k + 1])) ? v[k + 1] : v[k - 1] + 1,
+            y = x - k;
+        while (x < N && y < M && a[x] === b[y]) { x++; y++; }
+        v[k] = x;
+        if (x >= N && y >= M) { trace.push({...v}); return buildExactDiff(trace, a, b); }
+      }
+      trace.push({...v});
+    }
+  }
+  
+  function buildExactDiff(trace, a, b) {
+    let x = a.length, y = b.length, result = [];
+    for (let d = trace.length - 1; d >= 0; d--) {
+      const v = trace[d], k = x - y,
+            prevK = (k === -d || (k !== d && v[k - 1] < v[k + 1])) ? k + 1 : k - 1,
+            prevX = trace[d][prevK], prevY = prevX - prevK;
+      while (x > prevX && y > prevY) { 
+        result.unshift({
+          type: 'unchanged',
+          originalLine: a[x - 1],
+          modifiedLine: a[x - 1],
+          originalLineNum: x,
+          modifiedLineNum: y,
+          wordDiff: null
+        }); 
+        x--; y--; 
+      }
+      if (d > 0) {
+        if (x === prevX) {
+          result.unshift({
+            type: 'add',
+            originalLine: null,
+            modifiedLine: b[prevY],
+            originalLineNum: null,
+            modifiedLineNum: prevY + 1,
+            wordDiff: null
+          });
+        } else {
+          result.unshift({
+            type: 'remove',
+            originalLine: a[prevX],
+            modifiedLine: null,
+            originalLineNum: prevX + 1,
+            modifiedLineNum: null,
+            wordDiff: null
+          });
+        }
+      }
+      x = prevX; y = prevY;
+    }
+    return result;
+  }
+  
+  // Fuzzy diff algorithm
+  function fuzzyDiff(originalUnits, modifiedUnits, threshold, contextWindow) {
+    const result = [];
+    const usedOriginal = new Set();
+    const usedModified = new Set();
+    
+    // First pass: find exact matches
+    for (let i = 0; i < originalUnits.length; i++) {
+      for (let j = 0; j < modifiedUnits.length; j++) {
+        if (!usedOriginal.has(i) && !usedModified.has(j) && originalUnits[i] === modifiedUnits[j]) {
+          result.push({
+            type: 'unchanged',
+            originalLine: originalUnits[i],
+            modifiedLine: modifiedUnits[j],
+            originalLineNum: i + 1,
+            modifiedLineNum: j + 1,
+            wordDiff: null,
+            confidence: 1.0
+          });
+          usedOriginal.add(i);
+          usedModified.add(j);
+        }
+      }
+    }
+    
+    // Second pass: find fuzzy matches
+    for (let i = 0; i < originalUnits.length; i++) {
+      if (usedOriginal.has(i)) continue;
+      
+      let bestMatch = null;
+      let bestConfidence = 0;
+      let bestJ = -1;
+      
+      for (let j = 0; j < modifiedUnits.length; j++) {
+        if (usedModified.has(j)) continue;
+        
+        const fuzzyResult = fuzzyLineMatch(originalUnits[i], modifiedUnits[j], threshold);
+        if (fuzzyResult.match && fuzzyResult.confidence > bestConfidence) {
+          bestMatch = fuzzyResult;
+          bestConfidence = fuzzyResult.confidence;
+          bestJ = j;
+        }
+      }
+      
+      if (bestMatch) {
+        const wordDiff = diffWords(originalUnits[i], modifiedUnits[bestJ]);
+        result.push({
+          type: 'modified',
+          originalLine: originalUnits[i],
+          modifiedLine: modifiedUnits[bestJ],
+          originalLineNum: i + 1,
+          modifiedLineNum: bestJ + 1,
+          wordDiff: wordDiff,
+          confidence: bestConfidence
+        });
+        usedOriginal.add(i);
+        usedModified.add(bestJ);
+      }
+    }
+    
+    // Third pass: mark remaining as added/removed
+    for (let i = 0; i < originalUnits.length; i++) {
+      if (!usedOriginal.has(i)) {
+        result.push({
+          type: 'remove',
+          originalLine: originalUnits[i],
+          modifiedLine: null,
+          originalLineNum: i + 1,
+          modifiedLineNum: null,
+          wordDiff: null,
+          confidence: null
+        });
+      }
+    }
+    
+    for (let j = 0; j < modifiedUnits.length; j++) {
+      if (!usedModified.has(j)) {
+        result.push({
+          type: 'add',
+          originalLine: null,
+          modifiedLine: modifiedUnits[j],
+          originalLineNum: null,
+          modifiedLineNum: j + 1,
+          wordDiff: null,
+          confidence: null
+        });
+      }
+    }
+    
+    // Sort by line numbers
+    result.sort((a, b) => {
+      const aNum = a.originalLineNum || a.modifiedLineNum || 0;
+      const bNum = b.originalLineNum || b.modifiedLineNum || 0;
+      return aNum - bNum;
+    });
+    
+    return result;
+  }
+  
+  function renderWordDiff(wordDiff) {
+    return wordDiff.map(word => {
+      if (word.type === 'unchanged') {
+        return word.value;
+      } else if (word.type === 'added') {
+        return `<span class="word-added">${word.value}</span>`;
+      } else if (word.type === 'removed') {
+        return `<span class="word-removed">${word.value}</span>`;
+      }
+      return word.value;
+    }).join('');
+  }
+  
+  function showUnifiedView(diffs) {
+    output.innerHTML = '';
+    let addedLines = 0, removedLines = 0, modifiedLines = 0;
+    let txt = '';
+    
+    diffs.forEach(d => {
+      const el = document.createElement('div');
+      
+      if (d.type === 'unchanged') {
+        el.className = 'diff-line diff-unchanged-line';
+        el.innerHTML = `<span class="diff-line-number">${d.originalLineNum}</span>${d.originalLine}`;
+        txt += `  ${d.originalLine}\n`;
+      } else if (d.type === 'add') {
+        el.className = 'diff-line diff-add-line';
+        el.innerHTML = `<span class="diff-line-number">${d.modifiedLineNum}</span>${d.modifiedLine}`;
+        txt += `+ ${d.modifiedLine}\n`;
+        addedLines++;
+      } else if (d.type === 'remove') {
+        el.className = 'diff-line diff-remove-line';
+        el.innerHTML = `<span class="diff-line-number">${d.originalLineNum}</span>${d.originalLine}`;
+        txt += `- ${d.originalLine}\n`;
+        removedLines++;
+      } else if (d.type === 'modified') {
+        // Show both old and new versions with word highlighting
+        const oldEl = document.createElement('div');
+        oldEl.className = 'diff-line diff-remove-line fuzzy-match';
+        const oldWordDiff = d.wordDiff.map(word => {
+          if (word.type === 'removed') return `<span class="word-removed">${word.value}</span>`;
+          if (word.type === 'unchanged') return word.value;
+          return '';
+        }).join('');
+        oldEl.innerHTML = `<span class="diff-line-number">${d.originalLineNum}</span>${oldWordDiff}`;
+        
+        if (d.confidence && d.confidence < 1.0) {
+          const badge = document.createElement('span');
+          badge.className = 'confidence-badge';
+          badge.textContent = Math.round(d.confidence * 100) + '%';
+          badge.title = `Fuzzy match confidence: ${Math.round(d.confidence * 100)}%`;
+          oldEl.appendChild(badge);
+        }
+        
+        const newEl = document.createElement('div');
+        newEl.className = 'diff-line diff-add-line fuzzy-match';
+        const newWordDiff = d.wordDiff.map(word => {
+          if (word.type === 'added') return `<span class="word-added">${word.value}</span>`;
+          if (word.type === 'unchanged') return word.value;
+          return '';
+        }).join('');
+        newEl.innerHTML = `<span class="diff-line-number">${d.modifiedLineNum}</span>${newWordDiff}`;
+        
+        if (d.confidence && d.confidence < 1.0) {
+          const badge = document.createElement('span');
+          badge.className = 'confidence-badge';
+          badge.textContent = Math.round(d.confidence * 100) + '%';
+          badge.title = `Fuzzy match confidence: ${Math.round(d.confidence * 100)}%`;
+          newEl.appendChild(badge);
+        }
+        
+        output.appendChild(oldEl);
+        output.appendChild(newEl);
+        
+        txt += `- ${d.originalLine}\n+ ${d.modifiedLine}\n`;
+        modifiedLines++;
+        return;
+      }
+      
+      output.appendChild(el);
+    });
+    
+    const totalChanges = addedLines + removedLines + modifiedLines;
+    const mode = modeSelect.value;
+    const matching = matchingSelect.value;
+    const granularity = granularitySelect.value;
+    
+    summary.innerHTML = `<strong>${totalChanges} changes:</strong> ${addedLines} added, ${removedLines} removed, ${modifiedLines} modified ${granularity}s | Mode: ${mode} (${matching})`;
+    lastText = txt;
+  }
+  
+  function showSideByView(diffs) {
+    output.innerHTML = '';
+    output.className = 'side-by-side';
+    
+    const leftSide = document.createElement('div');
+    leftSide.className = 'side';
+    leftSide.innerHTML = '<div class="side-header original">Original</div><div class="side-content" id="left-content"></div>';
+    
+    const rightSide = document.createElement('div');
+    rightSide.className = 'side';
+    rightSide.innerHTML = '<div class="side-header modified">Modified</div><div class="side-content" id="right-content"></div>';
+    
+    output.appendChild(leftSide);
+    output.appendChild(rightSide);
+    
+    const leftContent = document.getElementById('left-content');
+    const rightContent = document.getElementById('right-content');
+    
+    let addedLines = 0, removedLines = 0, modifiedLines = 0;
+    let txt = '';
+    
+    diffs.forEach(d => {
+      if (d.type === 'unchanged') {
+        const leftEl = document.createElement('div');
+        leftEl.className = 'side-line';
+        leftEl.innerHTML = `<span class="side-line-number">${d.originalLineNum}</span><span class="side-line-content">${d.originalLine}</span>`;
+        
+        const rightEl = document.createElement('div');
+        rightEl.className = 'side-line';
+        rightEl.innerHTML = `<span class="side-line-number">${d.modifiedLineNum}</span><span class="side-line-content">${d.modifiedLine}</span>`;
+        
+        leftContent.appendChild(leftEl);
+        rightContent.appendChild(rightEl);
+        txt += `  ${d.originalLine}\n`;
+      } else if (d.type === 'add') {
+        const leftEl = document.createElement('div');
+        leftEl.className = 'side-line';
+        leftEl.innerHTML = `<span class="side-line-number"></span><span class="side-line-content"></span>`;
+        
+        const rightEl = document.createElement('div');
+        rightEl.className = 'side-line added';
+        rightEl.innerHTML = `<span class="side-line-number">${d.modifiedLineNum}</span><span class="side-line-content">${d.modifiedLine}</span>`;
+        
+        leftContent.appendChild(leftEl);
+        rightContent.appendChild(rightEl);
+        txt += `+ ${d.modifiedLine}\n`;
+        addedLines++;
+      } else if (d.type === 'remove') {
+        const leftEl = document.createElement('div');
+        leftEl.className = 'side-line removed';
+        leftEl.innerHTML = `<span class="side-line-number">${d.originalLineNum}</span><span class="side-line-content">${d.originalLine}</span>`;
+        
+        const rightEl = document.createElement('div');
+        rightEl.className = 'side-line';
+        rightEl.innerHTML = `<span class="side-line-number"></span><span class="side-line-content"></span>`;
+        
+        leftContent.appendChild(leftEl);
+        rightContent.appendChild(rightEl);
+        txt += `- ${d.originalLine}\n`;
+        removedLines++;
+      } else if (d.type === 'modified') {
+        const leftWordDiff = d.wordDiff.map(word => {
+          if (word.type === 'removed') return `<span class="word-removed">${word.value}</span>`;
+          if (word.type === 'unchanged') return word.value;
+          return '';
+        }).join('');
+        
+        const rightWordDiff = d.wordDiff.map(word => {
+          if (word.type === 'added') return `<span class="word-added">${word.value}</span>`;
+          if (word.type === 'unchanged') return word.value;
+          return '';
+        }).join('');
+        
+        const leftEl = document.createElement('div');
+        leftEl.className = 'side-line changed';
+        leftEl.innerHTML = `<span class="side-line-number">${d.originalLineNum}</span><span class="side-line-content">${leftWordDiff}</span>`;
+        
+        const rightEl = document.createElement('div');
+        rightEl.className = 'side-line changed';
+        rightEl.innerHTML = `<span class="side-line-number">${d.modifiedLineNum}</span><span class="side-line-content">${rightWordDiff}</span>`;
+        
+        // Add confidence indicators for fuzzy matches
+        if (d.confidence && d.confidence < 1.0) {
+          const leftBadge = document.createElement('span');
+          leftBadge.className = 'confidence-badge';
+          leftBadge.textContent = Math.round(d.confidence * 100) + '%';
+          leftBadge.title = `Fuzzy match confidence: ${Math.round(d.confidence * 100)}%`;
+          leftEl.appendChild(leftBadge);
+          
+          const rightBadge = document.createElement('span');
+          rightBadge.className = 'confidence-badge';
+          rightBadge.textContent = Math.round(d.confidence * 100) + '%';
+          rightBadge.title = `Fuzzy match confidence: ${Math.round(d.confidence * 100)}%`;
+          rightEl.appendChild(rightBadge);
+        }
+        
+        leftContent.appendChild(leftEl);
+        rightContent.appendChild(rightEl);
+        txt += `- ${d.originalLine}\n+ ${d.modifiedLine}\n`;
+        modifiedLines++;
+      }
+    });
+    
+    const totalChanges = addedLines + removedLines + modifiedLines;
+    const mode = modeSelect.value;
+    const matching = matchingSelect.value;
+    const granularity = granularitySelect.value;
+    
+    summary.innerHTML = `<strong>${totalChanges} changes:</strong> ${addedLines} added, ${removedLines} removed, ${modifiedLines} modified ${granularity}s | Mode: ${mode} (${matching})`;
+    lastText = txt;
+  }
+  
+  function show(diffs) {
+    currentDiffData = diffs;
+    
+    if (unifiedView.checked) {
+      showUnifiedView(diffs);
+    } else {
+      showSideByView(diffs);
+    }
+    
+    copyBtn.disabled = false;
+    downloadBtn.disabled = false;
+    results.style.display = 'block';
+    outdatedNotice.style.display = 'none';
+    results.classList.remove('results-outdated');
+    
+    // Store the current state
+    lastOriginalText = orig.value;
+    lastModifiedText = mod.value;
+    lastIgnoreWhitespace = ignoreCb.checked;
+  }
+  
+  function clearRes(){
+    results.style.display='none';
+    output.innerHTML='';
+    output.className = '';
+    summary.textContent='';
+    copyBtn.disabled=true;
+    downloadBtn.disabled=true;
+    lastText='';
+    currentDiffData = null;
+    outdatedNotice.style.display = 'none';
+    results.classList.remove('results-outdated');
+    lastOriginalText = '';
+    lastModifiedText = '';
+  }
+  
+  function markResultsOutdated(){
+    if(results.style.display !== 'none'){
+      outdatedNotice.style.display = 'block';
+      results.classList.add('results-outdated');
+    }
+  }
+  
+  function checkIfResultsOutdated(){
+    if(results.style.display !== 'none'){
+      const currentOriginal = orig.value;
+      const currentModified = mod.value;
+      const currentIgnoreWhitespace = ignoreCb.checked;
+      
+      if(currentOriginal !== lastOriginalText || 
+         currentModified !== lastModifiedText || 
+         currentIgnoreWhitespace !== lastIgnoreWhitespace){
+        markResultsOutdated();
+      }
+    }
+  }
+  
+  function run(){
+    let a = orig.value, b = mod.value;
+    
+    if(!a.trim() && !b.trim()){
+      clearRes();
+      summary.textContent='Please enter text in one or both fields';
+      results.style.display = 'block';
+      return;
+    }
+    
+    if(ignoreCb.checked){
+      a = a.split('\n').map(l => l.trim().replace(/\s+/g,' ')).join('\n');
+      b = b.split('\n').map(l => l.trim().replace(/\s+/g,' ')).join('\n');
+    }
+    
+    if(a === b){ 
+      clearRes(); 
+      summary.textContent = 'No differences found'; 
+      results.style.display = 'block';
+      return; 
+    }
+    
+    // Get current settings
+    const mode = modeSelect.value;
+    const matching = matchingSelect.value;
+    const granularity = granularitySelect.value;
+    const threshold = parseFloat(fuzzyThreshold.value);
+    const windowSize = parseInt(contextWindow.value);
+    
+    // Split text by granularity
+    const originalUnits = splitByGranularity(a, granularity);
+    const modifiedUnits = splitByGranularity(b, granularity);
+    
+    // Run diff with selected options
+    const options = {
+      matching: matching,
+      threshold: threshold,
+      contextWindow: windowSize
+    };
+    
+    const diffs = enhancedDiff(originalUnits, modifiedUnits, options);
+    show(diffs);
+  }
+  
+  function copy(){ 
+    if(lastText) {
+      navigator.clipboard.writeText(lastText).then(() => {
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+      });
+    }
+  }
+  
+  function download(){
+    if(!lastText) return;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const mode = modeSelect.value;
+    const matching = matchingSelect.value;
+    const granularity = granularitySelect.value;
+    const threshold = fuzzyThreshold.value;
+    
+    const header = `QuickDiff Results - Generated on ${new Date().toLocaleString()}\n` +
+                  `${'='.repeat(60)}\n\n` +
+                  `Settings:\n` +
+                  `  Mode: ${mode}\n` +
+                  `  Matching: ${matching}\n` +
+                  `  Granularity: ${granularity}\n` +
+                  `  Fuzzy Threshold: ${threshold}\n` +
+                  `  Ignore Whitespace: ${ignoreCb.checked}\n\n` +
+                  `Summary: ${summary.textContent}\n\n` +
+                  `Legend:\n` +
+                  `  + Added content\n` +
+                  `  - Removed content\n` +
+                  `  ~ Modified content (fuzzy matches)\n` +
+                  `    Unchanged content\n\n` +
+                  `${'='.repeat(60)}\n\n`;
+    
+    const fullContent = header + lastText;
+    
+    const blob = new Blob([fullContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quickdiff-results-${timestamp}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    const originalText = downloadBtn.textContent;
+    downloadBtn.textContent = 'Downloaded!';
+    setTimeout(() => {
+      downloadBtn.textContent = originalText;
+    }, 2000);
+  }
+  
+  function load(){
+    orig.value = document.getElementById('sample-original').innerHTML.trim();
+    mod.value  = document.getElementById('sample-modified').innerHTML.trim();
+    clearRes();
+  }
+  
+  function switchView() {
+    if (currentDiffData) {
+      show(currentDiffData);
+    }
+  }
+  
+  // Event listeners
+  runBtn.addEventListener('click', run);
+  copyBtn.addEventListener('click', copy);
+  downloadBtn.addEventListener('click', download);
+  loadBtn.addEventListener('click', load);
+  unifiedView.addEventListener('change', switchView);
+  sideView.addEventListener('change', switchView);
+  
+  orig.addEventListener('input', checkIfResultsOutdated);
+  mod.addEventListener('input', checkIfResultsOutdated);
+  ignoreCb.addEventListener('change', checkIfResultsOutdated);
+  
+  // Mark results as outdated when settings change
+  modeSelect.addEventListener('change', checkIfResultsOutdated);
+  matchingSelect.addEventListener('change', checkIfResultsOutdated);
+  granularitySelect.addEventListener('change', checkIfResultsOutdated);
+  fuzzyThreshold.addEventListener('change', checkIfResultsOutdated);
+  contextWindow.addEventListener('change', checkIfResultsOutdated);
+  
+  document.addEventListener('keydown', (e) => {
+    if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+      e.preventDefault();
+      run();
+    }
+  });
+});
+</script>
+</body>
+</html>
