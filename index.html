@@ -716,6 +716,9 @@ document.addEventListener('DOMContentLoaded',() => {
       output.appendChild(el);
     });
     
+    // Add interactive features after rendering
+    addInteractiveFeatures();
+    
     const totalChanges = addedLines + removedLines + modifiedLines;
     const mode = modeSelect.value;
     const matching = matchingSelect.value;
@@ -828,6 +831,9 @@ document.addEventListener('DOMContentLoaded',() => {
       }
     });
     
+    // Add interactive features after rendering
+    addInteractiveFeatures();
+    
     const totalChanges = addedLines + removedLines + modifiedLines;
     const mode = modeSelect.value;
     const matching = matchingSelect.value;
@@ -835,6 +841,205 @@ document.addEventListener('DOMContentLoaded',() => {
     
     summary.innerHTML = `<strong>${totalChanges} changes:</strong> ${addedLines} added, ${removedLines} removed, ${modifiedLines} modified ${granularity}s | Mode: ${mode} (${matching})`;
     lastText = txt;
+  }
+  
+  // Interactive features implementation
+  function addInteractiveFeatures() {
+    // Add double-click word navigation
+    const allLines = output.querySelectorAll('.diff-line, .side-line');
+    allLines.forEach(line => {
+      line.addEventListener('dblclick', handleWordDoubleClick);
+    });
+    
+    // Add hover confidence tooltips for fuzzy matches
+    const fuzzyElements = output.querySelectorAll('.fuzzy-match, .word-added, .word-removed, .word-changed-old, .word-changed-new');
+    fuzzyElements.forEach(element => {
+      element.addEventListener('mouseenter', showConfidenceTooltip);
+      element.addEventListener('mouseleave', hideConfidenceTooltip);
+    });
+    
+    // Add match highlighting on hover
+    const wordElements = output.querySelectorAll('.word-added, .word-removed, .word-changed-old, .word-changed-new');
+    wordElements.forEach(element => {
+      element.addEventListener('mouseenter', highlightMatches);
+      element.addEventListener('mouseleave', clearHighlights);
+    });
+  }
+  
+  function handleWordDoubleClick(event) {
+    const clickedElement = event.target;
+    const clickedText = clickedElement.textContent.trim();
+    
+    if (clickedText.length < 3) return; // Skip very short words
+    
+    // Extract words from the clicked text
+    const words = clickedText.split(/\s+/).filter(word => word.length > 2);
+    if (words.length === 0) return;
+    
+    // Find matching context in other lines
+    const allLines = output.querySelectorAll('.diff-line, .side-line');
+    let foundMatches = [];
+    
+    allLines.forEach((line, index) => {
+      const lineText = line.textContent.toLowerCase();
+      words.forEach(word => {
+        if (lineText.includes(word.toLowerCase()) && line !== clickedElement.closest('.diff-line, .side-line')) {
+          foundMatches.push({ line, word, index });
+        }
+      });
+    });
+    
+    // Highlight matches and scroll to first one
+    clearHighlights();
+    foundMatches.forEach(match => {
+      match.line.classList.add('match-highlight');
+      match.line.style.backgroundColor = '#ffeb3b';
+    });
+    
+    if (foundMatches.length > 0) {
+      foundMatches[0].line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Show temporary notification
+      showNotification(`Found ${foundMatches.length} match(es) for "${words[0]}"`);
+    } else {
+      showNotification(`No matches found for "${words[0]}"`);
+    }
+  }
+  
+  function showConfidenceTooltip(event) {
+    const element = event.target;
+    const diffData = currentDiffData;
+    
+    if (!diffData) return;
+    
+    // Find the confidence score for this element
+    const lineElement = element.closest('.diff-line, .side-line');
+    if (!lineElement) return;
+    
+    const lineNumber = lineElement.querySelector('.diff-line-number, .side-line-number')?.textContent;
+    if (!lineNumber) return;
+    
+    // Find matching diff data
+    const matchingDiff = diffData.find(d => 
+      d.originalLineNum == lineNumber || d.modifiedLineNum == lineNumber
+    );
+    
+    if (matchingDiff && matchingDiff.confidence && matchingDiff.confidence < 1.0) {
+      const tooltip = document.createElement('div');
+      tooltip.className = 'confidence-tooltip';
+      tooltip.innerHTML = `
+        <strong>Fuzzy Match</strong><br>
+        Confidence: ${Math.round(matchingDiff.confidence * 100)}%<br>
+        <small>Based on ${matchingSelect.value} matching</small>
+      `;
+      tooltip.style.cssText = `
+        position: absolute;
+        background: #333;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.8em;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        max-width: 200px;
+      `;
+      
+      const rect = element.getBoundingClientRect();
+      tooltip.style.left = (rect.left + window.scrollX) + 'px';
+      tooltip.style.top = (rect.top + window.scrollY - 60) + 'px';
+      
+      document.body.appendChild(tooltip);
+      element._tooltip = tooltip;
+    }
+  }
+  
+  function hideConfidenceTooltip(event) {
+    const element = event.target;
+    if (element._tooltip) {
+      document.body.removeChild(element._tooltip);
+      delete element._tooltip;
+    }
+  }
+  
+  function highlightMatches(event) {
+    const element = event.target;
+    const word = element.textContent.trim().toLowerCase();
+    
+    if (word.length < 3) return;
+    
+    // Find and highlight similar words
+    const allWordElements = output.querySelectorAll('.word-added, .word-removed, .word-changed-old, .word-changed-new');
+    allWordElements.forEach(el => {
+      const elWord = el.textContent.trim().toLowerCase();
+      const similarity = calculateSimilarity(word, elWord);
+      
+      if (similarity > 0.7 && el !== element) {
+        el.style.outline = '2px solid #007bff';
+        el.style.outlineOffset = '1px';
+        el.title = `${Math.round(similarity * 100)}% similar to "${word}"`;
+      }
+    });
+  }
+  
+  function clearHighlights() {
+    // Clear match highlights
+    const highlighted = output.querySelectorAll('.match-highlight');
+    highlighted.forEach(el => {
+      el.classList.remove('match-highlight');
+      el.style.backgroundColor = '';
+    });
+    
+    // Clear word outlines
+    const outlined = output.querySelectorAll('.word-added, .word-removed, .word-changed-old, .word-changed-new');
+    outlined.forEach(el => {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+      el.title = '';
+    });
+  }
+  
+  function showNotification(message) {
+    // Remove existing notification
+    const existing = document.querySelector('.temp-notification');
+    if (existing) existing.remove();
+    
+    const notification = document.createElement('div');
+    notification.className = 'temp-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #007bff;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 0.9em;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      animation: slideIn 0.3s ease-out;
+    `;
+    
+    // Add slide-in animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.animation = 'slideIn 0.3s ease-out reverse';
+        setTimeout(() => notification.remove(), 300);
+      }
+    }, 3000);
   }
   
   function show(diffs) {
