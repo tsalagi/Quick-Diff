@@ -42,7 +42,8 @@ _Port 3000 must be free._
 - **Copy Results**: Copy diff text (with `+`/`-` prefixes) to clipboard.
 - **Load Sample**: Quickly populate with a hidden 10-line Lorem Ipsum pair for instant testing.
 
-<img width="731" height="1115" alt="QuickDiff (2)" src="https://github.com/user-attachments/assets/078541b8-b0c1-44c1-9975-b6a71145dede" />
+<img width="747" height="1221" alt="image" src="https://github.com/user-attachments/assets/bfd344fc-a3bd-4bd1-952c-dac21170e966" />
+
 
 ## Usage
 
