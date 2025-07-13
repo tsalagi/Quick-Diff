@@ -1,6 +1,6 @@
 # QuickDiff
 
-QuickDiff is a lightweight, dependency-free web-based diff checker that lets you compare two blocks of text and visualize line-by-line changes.
+QuickDiff is a lightweight, dependency-free web-based diff checker that lets you compare two blocks of text and visualize line-by-line changes. The primary use case is comparing documents, manuscripts, or transcriptions. This is not made primarily for the coder.
 
 ## Project Structure
 
